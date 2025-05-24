@@ -1,34 +1,34 @@
-import socket
-import json
-import base64
-import logging
+import socket 
+import json  
+import base64 
+import logging 
 import os
 
+# Alamat dan port default server
 server_address = ('0.0.0.0', 7777)
 
+# Fungsi untuk mengirim perintah ke server
 def send_command(command_str=""):
     global server_address
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.connect(server_address)
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Membuat socket TCP
+    sock.connect(server_address)  # Terhubung ke server
     logging.warning(f"connecting to {server_address}")
     try:
         logging.warning(f"sending message ")
-        sock.sendall(command_str.encode())
-        # Look for the response, waiting until socket is done (no more data)
-        data_received = "" #empty string
+        sock.sendall(command_str.encode())  # Kirim perintah sebagai bytes
+
+        # Menerima data dari server, dalam bentuk bertahap (chunk)
+        data_received = ""  # buffer untuk menampung data
         while True:
-            #socket does not receive all data at once, data comes in part, need to be concatenated at the end of process
-            data = sock.recv(16)
+            data = sock.recv(16)  # Terima data dalam potongan 16 byte
             if data:
-                #data is not empty, concat with previous content
-                data_received += data.decode()
-                if "\r\n\r\n" in data_received:
+                data_received += data.decode()  # Gabungkan ke buffer
+                if "\r\n\r\n" in data_received:  # Protokol untuk akhir data
                     break
             else:
-                # no more data, stop the process by break
-                break
-        # at this point, data_received (string) will contain all data coming from the socket
-        # to be able to use the data_received as a dict, need to load it using json.loads()
+                break  # Tidak ada data lagi
+
+        # Ubah string JSON menjadi dictionary Python
         hasil = json.loads(data_received)
         logging.warning("data received from server:")
         return hasil
@@ -36,26 +36,29 @@ def send_command(command_str=""):
         logging.warning(f"error during data sending/receiving: {str(e)}")
         return False
 
-
+# Fungsi untuk menampilkan daftar file di server
 def remote_list():
-    command_str = f"LIST"
+    command_str = f"LIST"  # Kirim perintah LIST
     hasil = send_command(command_str)
     if (hasil['status'] == 'OK'):
         print("daftar file : ")
-        for nmfile in hasil['data']:
+        for nmfile in hasil['data']:  # Tampilkan semua nama file
             print(f"- {nmfile}")
         return True
     else:
         print("Gagal")
         return False
 
+# Fungsi untuk mengunduh file dari server
 def remote_get(filename=""):
-    command_str = f"GET {filename}"
+    command_str = f"GET {filename}"  # Kirim perintah GET <nama file>
     hasil = send_command(command_str)
     if (hasil['status'] == 'OK'):
-        #proses file dalam bentuk base64 ke bentuk bytes
+        # Decode isi file dari base64 ke bytes
         namafile = hasil['data_namafile']
         isifile = base64.b64decode(hasil['data_file'])
+
+        # Simpan file hasil download ke disk
         fp = open(namafile, 'wb+')
         fp.write(isifile)
         fp.close()
@@ -65,22 +68,22 @@ def remote_get(filename=""):
         print(f"Gagal: {hasil['data']}")
         return False
 
+# Fungsi untuk mengunggah file ke server
 def remote_upload(local_filename="", remote_filename=""):
     if remote_filename == "":
+        # Jika nama remote tidak diisi, gunakan nama file lokal
         remote_filename = os.path.basename(local_filename)
-    
+
     try:
-        # Read the file and encode to base64
+        # Baca isi file lokal dan encode ke base64
         with open(local_filename, 'rb') as fp:
             file_content = fp.read()
-        
         file_content_base64 = base64.b64encode(file_content).decode()
-        
-        # Send the command "UPLOAD filename" first, followed by the base64 content
-        # This ensures proper command parsing on the server side
+
+        # Format perintah: UPLOAD <nama file> <isi file base64>
         command_str = f"UPLOAD {remote_filename} {file_content_base64}"
         hasil = send_command(command_str)
-        
+
         if (hasil['status'] == 'OK'):
             print(f"File {remote_filename} berhasil diupload")
             return True
@@ -91,8 +94,9 @@ def remote_upload(local_filename="", remote_filename=""):
         print(f"Error: {str(e)}")
         return False
 
+# Fungsi untuk menghapus file dari server
 def remote_delete(filename=""):
-    command_str = f"DELETE {filename}"
+    command_str = f"DELETE {filename}"  # Kirim perintah DELETE <nama file>
     hasil = send_command(command_str)
     
     if (hasil['status'] == 'OK'):
@@ -102,24 +106,24 @@ def remote_delete(filename=""):
         print(f"Gagal menghapus: {hasil['data']}")
         return False
 
-
+# Bagian utama program
 if __name__ == '__main__':
-    server_address = ('127.0.0.1', 6666)
-    
-    # Set up basic logging configuration
+    server_address = ('127.0.0.1', 6666)  # Ganti alamat server saat dijalankan
+
+    # Konfigurasi logging
     logging.basicConfig(level=logging.WARNING)
-    
-    # Show menu for user interaction
+
+    # Menu interaktif untuk pengguna
     while True:
         print("\n==== FILE SERVER CLIENT ====")
-        print("1. List Files")
-        print("2. Download File")
-        print("3. Upload File")
-        print("4. Delete File")
-        print("0. Exit")
+        print("1. List Files")        # Menampilkan semua file yang tersedia di server
+        print("2. Download File")     # Mengunduh file dari server
+        print("3. Upload File")       # Mengunggah file ke server
+        print("4. Delete File")       # Menghapus file dari server
+        print("0. Exit")              # Keluar dari program
         
-        choice = input("Choose an option: ")
-        
+        choice = input("Choose an option: ")  # Ambil input pilihan
+
         if choice == "1":
             remote_list()
         elif choice == "2":
